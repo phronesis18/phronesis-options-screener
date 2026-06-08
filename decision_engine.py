@@ -80,7 +80,7 @@ class TradeDecision:
         return self._render_full()
 
     def _render_full(self) -> str:
-        """Rendu complet de la fiche de décision (console)."""
+        """Rendu complet de la fiche de décision (console) — protégé contre None."""
         strat_name = ""
         if self.recommendation:
             info = STRATEGY_CATALOG.get(self.recommendation.primary_strategy, {})
@@ -90,16 +90,20 @@ class TradeDecision:
         bar = "█" * (self.conviction_score // 5) + "░" * (20 - self.conviction_score // 5)
         go_icon = "✅ GO" if self.go_no_go else "🚫 NO-GO"
 
+        # Valeurs formatées avec gestion de None
+        iv_str = f"{self.iv_rank:.0f}%" if self.iv_rank is not None else "N/A"
+        be_str = f"{self.breakeven:.2f}" if self.breakeven is not None else "N/A"
+        entry_limit_str = f"{self.entry_price_limit:.2f}" if self.entry_price_limit is not None else "N/A"
+
         lines = [
             f"\n  {'╔' + '═'*58 + '╗'}",
             f"  ║  🎯 FICHE DE DÉCISION — {self.symbol:<10}  {go_icon:<18} ║",
             f"  {'╠' + '═'*58 + '╣'}",
             f"  ║  Stratégie   : {strat_name:<42} ║",
             f"  ║  Conviction  : [{bar}] {self.conviction_score:3}/100     ║",
-            f"  ║  IV Rank     : {str(f'{self.iv_rank:.0f}%') if self.iv_rank else 'N/A':<10}"
-            f"  Risque max   : {self.risk_usd:6.0f}$          ║",
+            f"  ║  IV Rank     : {iv_str:<10}  Risque max   : {self.risk_usd:6.0f}$          ║",
             f"  ║  Profit max  : {self.max_profit_usd:6.0f}$  "
-            f"  Break-even   : {str(f'{self.breakeven:.2f}') if self.breakeven else 'N/A':<10}  ║",
+            f"  Break-even   : {be_str:<10}  ║",
             f"  {'╠' + '═'*58 + '╣'}",
         ]
 
@@ -112,23 +116,27 @@ class TradeDecision:
                 f"  Expiry : {s.expiry}  DTE: {s.dte}j     ║",
             ]
             if s.net_credit > 0:
+                credit_or_debit = s.net_credit
+                limit = self.entry_price_limit or s.net_credit
                 lines.append(
-                    f"  ║  Crédit  : {s.net_credit:.2f}$  "
-                    f"  Prix limite : {self.entry_price_limit or s.net_credit:.2f}$              ║"
+                    f"  ║  Crédit  : {credit_or_debit:.2f}$  "
+                    f"  Prix limite : {limit:.2f}$              ║"
                 )
             else:
+                debit_or_credit = s.net_debit
+                limit = self.entry_price_limit or s.net_debit
                 lines.append(
-                    f"  ║  Débit   : {s.net_debit:.2f}$  "
-                    f"  Prix limite : {self.entry_price_limit or s.net_debit:.2f}$              ║"
+                    f"  ║  Débit   : {debit_or_credit:.2f}$  "
+                    f"  Prix limite : {limit:.2f}$              ║"
                 )
 
         # Plan de sortie
+        tp_str = f"{self.take_profit_price:.2f}$" if self.take_profit_price is not None else "N/A"
         lines += [
             f"  {'╠' + '═'*58 + '╣'}",
             f"  ║  📤 SORTIE",
             f"  ║  Take Profit : {self.take_profit_pct:.0f}% du profit max"
-            f"  → {self.take_profit_price:.2f}$ " if self.take_profit_price
-            else f"  ║  Take Profit : {self.take_profit_pct:.0f}% du profit max" + " " * 20 + "║",
+            f"  → {tp_str:<10} ║",
             f"  ║  Stop Loss   : {self.stop_loss_pct:.0f}% de la perte max"
             + " " * 22 + "║",
             f"  ║  Exit temps  : Fermer si DTE ≤ {self.max_dte_exit}j"
@@ -143,14 +151,17 @@ class TradeDecision:
         lines.append(f"  ║  ✅ CHECKLIST PRÉ-TRADE (Module 9.3)")
         for item, checked in self.checklist.items():
             icon = "☑" if checked else "☐"
-            lines.append(f"  ║  {icon} {item[:54]:<54} ║")
+            # Troncature pour éviter les débordements
+            short_item = item[:54] if len(item) > 54 else item
+            lines.append(f"  ║  {icon} {short_item:<54} ║")
 
         # Avertissements
         if self.recommendation and self.recommendation.warnings:
             lines.append(f"  {'╠' + '═'*58 + '╣'}")
             lines.append(f"  ║  ⚠️  POINTS DE VIGILANCE")
             for w in self.recommendation.warnings[:3]:
-                lines.append(f"  ║  • {w[:54]:<54} ║")
+                short_w = w[:54] if len(w) > 54 else w
+                lines.append(f"  ║  • {short_w:<54} ║")
 
         lines.append(f"  {'╚' + '═'*58 + '╝'}")
         return "\n".join(lines)
@@ -398,13 +409,14 @@ class DecisionEngine:
         # 1. Hypothèse directionnelle identifiée
         checklist["Hypothèse directionnelle identifiée"] = True
 
-        # 2. IV Rank vérifié
-        checklist[f"IV Rank vérifié ({iv_rank:.0f}% → {'options chères' if (iv_rank or 0) > 40 else 'options bon marché'})"] = \
+        # 2. IV Rank vérifié (gestion None)
+        iv_rank_str = f"{iv_rank:.0f}%" if iv_rank is not None else "N/A"
+        checklist[f"IV Rank vérifié ({iv_rank_str} → {'options chères' if (iv_rank or 0) > 40 else 'options bon marché'})"] = \
             iv_rank is not None
 
         # 3. Strike et expiration appropriés
-        checklist[f"Strike OTM ({abs(spread.leg1_strike/spread.spot - 1)*100:.1f}% OTM)"] = \
-            abs(spread.leg1_strike / spread.spot - 1) > 0.03
+        otm_pct = abs(spread.leg1_strike / spread.spot - 1) * 100
+        checklist[f"Strike OTM ({otm_pct:.1f}% OTM)"] = otm_pct > 3.0
 
         checklist[f"DTE optimal ({spread.dte}j, fenêtre 14–45j)"] = \
             14 <= spread.dte <= 45
@@ -418,8 +430,8 @@ class DecisionEngine:
 
         # 6. Pas d'earnings imminent
         no_event = days_to_event is None or days_to_event > 5
-        checklist[f"Pas d'annonce de résultats imminente ({f'{int(days_to_event)}j' if days_to_event else 'N/A'})"] = \
-            no_event
+        event_str = f"{int(days_to_event)}j" if days_to_event else "N/A"
+        checklist[f"Pas d'annonce de résultats imminente ({event_str})"] = no_event
 
         # 7. Liquidité
         min_oi = min(spread.leg1_oi, spread.leg2_oi)

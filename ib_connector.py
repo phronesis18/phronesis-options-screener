@@ -56,12 +56,17 @@ class IBConnector:
                     port=config.IBKR_PORT,
                     clientId=config.IBKR_CLIENT_ID,
                     timeout=config.IBKR_TIMEOUT,
-                    readonly=True,   # Lecture seule : pas d'ordres accidentels
+                    readonly=False,   # Permet de récupérer les données (nécessite TWS non "read-only")
                 )
+                # Récupération sécurisée de la version serveur
+                if hasattr(self._ib, 'client') and self._ib.client is not None:
+                    server_version = self._ib.client.serverVersion()
+                else:
+                    server_version = "inconnue"
                 self._connected = True
                 logger.info(
                     f"✅ Connecté à IBKR — "
-                    f"serverVersion={self._ib.serverVersion()}, "
+                    f"serverVersion={server_version}, "
                     f"account={self._ib.managedAccounts()}"
                 )
                 return True

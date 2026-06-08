@@ -27,3 +27,6 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Si .gitignore existe, on ajoute une exception
+echo "!data/opportunities.json" >> .gitignore
