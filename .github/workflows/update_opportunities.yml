@@ -11,22 +11,31 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # ← Évite les runs trop longs (blocages)
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install yfinance  # force l'installation
-      - name: Run scan
+          # Forcer l'installation des modules critiques (par sécurité)
+          pip install yfinance pandas numpy scipy ib_insync pandas-ta python-dotenv requests
+
+      - name: Run scan (limited symbols for speed)
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          # Désactiver IBKR en CI pour éviter les timeouts
+          DISABLE_IBKR: "true"
         run: python scripts/update_data.py
+
       - name: Commit and push if changes
         run: |
           git config user.name "github-actions[bot]"
