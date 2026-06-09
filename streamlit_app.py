@@ -8,6 +8,14 @@ import requests
 
 st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
 
+st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
+# Forcer le rendu en mode classique (évite certains bugs DOM)
+st.markdown("""
+    <style>
+        .stApp { background-color: var(--bg); }
+    </style>
+""", unsafe_allow_html=True)
+
 # ---------- Clé API DeepSeek (à mettre dans secrets en prod) ----------
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
 

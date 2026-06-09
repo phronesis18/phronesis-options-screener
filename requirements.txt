@@ -17,7 +17,7 @@ python-dotenv>=1.0.0
 requests>=2.31.0
 
 # Interface optionnelle Streamlit
-streamlit>=1.30.0
+streamlit>=1.35.0
 
 # Stockage SQLite (standard Python, pas de dépendance externe)
 # sqlite3 — inclus dans Python standard
