@@ -1,6 +1,6 @@
 """
-update_data.py — Scan périodique pour générer les opportunités
-Exécuté par GitHub Actions toutes les 2 heures.
+update_data.py — Scan périodique pour générer les opportunités (version CI rapide)
+Utilise uniquement yfinance, pas d'IBKR, et seulement quelques symboles.
 """
 
 import json
@@ -9,108 +9,132 @@ import os
 import sys
 from datetime import datetime
 
-# Ajouter le chemin racine pour importer les modules du projet
+# Ajouter le chemin racine
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ib_connector import IBConnector
-from data_fetcher import get_option_chain, get_atm_iv
-from models import MacroModel, ValueModel, IncomeModel, MomentumModel
+# Forcer l'utilisation de yfinance uniquement (pas d'IBKR)
+os.environ["DISABLE_IBKR"] = "true"
+
+import pandas as pd
+import yfinance as yf
 from spread_builder import SpreadBuilder
-from iv_percentile_storage import compute_iv_percentile, save_iv
-from decision_engine import evaluate_all_candidates
-from universe import get_priority_watchlist
-import config
+from models.income_model import IncomeModel
+from scoring_ia import score_from_dict
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-def run_scan_and_save(symbols=None, max_symbols=50):
-    """Scanne les symboles, génère les spreads, évalue les décisions, sauvegarde JSON."""
-    if symbols is None:
-        # Utiliser la watchlist prioritaire pour éviter trop de symboles
-        symbols = get_priority_watchlist(n=max_symbols)
-        logger.info(f"Scan de {len(symbols)} symboles prioritaires")
-    
-    connector = IBConnector()
-    # On essaie de se connecter, mais ce n'est pas bloquant (fallback yfinance)
-    connector.connect()
-    
-    macro_model = MacroModel()
-    value_model = ValueModel()
-    income_model = IncomeModel()
-    momentum_model = MomentumModel()
-    spread_builder = SpreadBuilder()
-    
-    all_candidates = []
-    macro_result = macro_model.analyze()
-    
-    for sym in symbols:
+# Liste réduite pour CI
+SYMBOLS_CI = ['SPY', 'QQQ']  # seulement 2 symboles
+
+def get_spot_yfinance(symbol: str) -> float:
+    ticker = yf.Ticker(symbol)
+    hist = ticker.history(period='1d')
+    if not hist.empty:
+        return float(hist['Close'].iloc[-1])
+    info = ticker.info
+    return float(info.get('regularMarketPrice', info.get('currentPrice', 0)))
+
+def get_option_chain_yfinance(symbol: str, days_min: int = 7, days_max: int = 60):
+    ticker = yf.Ticker(symbol)
+    expirations = ticker.options
+    if not expirations:
+        return pd.DataFrame()
+    today = datetime.now().date()
+    rows = []
+    for exp_str in expirations:
+        exp_date = datetime.strptime(exp_str, '%Y-%m-%d').date()
+        dte = (exp_date - today).days
+        if dte < days_min or dte > days_max:
+            continue
         try:
-            logger.info(f"Analyse de {sym}...")
-            chain = get_option_chain(sym)
-            if chain.empty:
-                logger.warning(f"{sym}: chaîne vide")
-                continue
-            current_iv = get_atm_iv(sym)
-            iv_percentile = None
-            if current_iv:
-                save_iv(sym, current_iv)
-                iv_percentile = compute_iv_percentile(sym, current_iv)
-            
-            value_result = value_model.analyze(sym, current_iv)
-            momentum_result = momentum_model.analyze(sym)
-            income_result = income_model.analyze(chain)
-            
-            pillars_passed = sum([
-                macro_result.signal != "neutral",
-                value_result.passed,
-                income_result.passed,
-                momentum_result.passed,
-            ])
-            if pillars_passed < 2:
-                continue
-            
-            candidates = spread_builder.build_all(
-                symbol=sym,
-                option_chain=chain,
-                momentum_bias=momentum_result.bias,
-                iv_percentile=iv_percentile,
-                days_to_event=None,
-            )
-            # Garder uniquement ceux avec score >= MODERATE (config)
-            strong = [c for c in candidates if c.scoring and c.scoring.score >= config.SCORE_MODERATE]
-            all_candidates.extend(strong)
-            logger.info(f"{sym}: {len(strong)} spreads retenus")
-        except Exception as e:
-            logger.error(f"Erreur sur {sym}: {e}")
+            chain = ticker.option_chain(exp_str)
+        except:
+            continue
+        for right, df in [('C', chain.calls), ('P', chain.puts)]:
+            for _, row in df.iterrows():
+                rows.append({
+                    'symbol': symbol,
+                    'expiry': exp_str.replace('-', ''),
+                    'dte': dte,
+                    'strike': row['strike'],
+                    'right': right,
+                    'bid': row['bid'] if not pd.isna(row['bid']) else 0,
+                    'ask': row['ask'] if not pd.isna(row['ask']) else 0,
+                    'iv': row['impliedVolatility'] if not pd.isna(row['impliedVolatility']) else 0,
+                    'delta': row.get('delta', 0),
+                    'theta': row.get('theta', 0),
+                    'open_interest': row['openInterest'] if not pd.isna(row['openInterest']) else 0,
+                    'volume': row['volume'] if not pd.isna(row['volume']) else 0,
+                })
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        spot = get_spot_yfinance(symbol)
+        df['spot'] = spot
+    return df
+
+def run_scan_and_save():
+    all_decisions = []
+    for symbol in SYMBOLS_CI:
+        logger.info(f"Scan {symbol}...")
+        spot = get_spot_yfinance(symbol)
+        chain = get_option_chain_yfinance(symbol)
+        if chain.empty:
+            logger.warning(f"Pas d'options pour {symbol}")
+            continue
+        
+        # Income filter simplifié
+        income = IncomeModel()
+        income_result = income.analyze(chain)
+        if not income_result.passed:
+            logger.info(f"{symbol} ne passe pas le filtre income")
+            continue
+        
+        # Construction des spreads
+        builder = SpreadBuilder()
+        candidates = builder.build_all(
+            symbol, chain,
+            momentum_bias='seller',
+            iv_percentile=50,
+            days_to_event=None
+        )
+        if not candidates:
+            logger.info(f"Aucun spread pour {symbol}")
+            continue
+        
+        # Scoring
+        for c in candidates:
+            score_data = {
+                "iv_percentile": 50,
+                "theta_abs": abs(c.leg1_theta) if hasattr(c, 'leg1_theta') else 0.05,
+                "delta": abs(c.leg1_delta) if hasattr(c, 'leg1_delta') else 0.2,
+                "open_interest": min(c.leg1_oi, c.leg2_oi),
+                "bid_ask_spread": (c.leg1_ask - c.leg1_bid) + (c.leg2_ask - c.leg2_bid) / 2,
+                "credit_received": c.net_credit,
+                "max_risk": c.risk_usd,
+                "spot": spot,
+                "strike": c.leg1_strike,
+                "symbol": symbol,
+                "strategy": c.strategy,
+            }
+            score_obj = score_from_dict(score_data)
+            all_decisions.append({
+                "symbol": symbol,
+                "strategy": c.strategy,
+                "strikes": f"{c.leg1_strike:.0f}/{c.leg2_strike:.0f}",
+                "expiry": c.expiry,
+                "dte": c.dte,
+                "credit": c.net_credit,
+                "risk": c.risk_usd,
+                "score": score_obj.score,
+                "label": score_obj.label,
+            })
     
-    connector.disconnect()
-    
-    if not all_candidates:
-        logger.info("Aucun spread candidat trouvé")
-        # Sauvegarder un tableau vide
-        os.makedirs("data", exist_ok=True)
-        with open("data/opportunities.json", "w", encoding="utf-8") as f:
-            json.dump([], f)
-        return
-    
-    # Évaluation des décisions
-    decisions = evaluate_all_candidates(
-        all_candidates,
-        momentum_signal=macro_result.signal,
-        macro_signal=macro_result.signal
-    )
-    
-    # Sérialisation
-    output = []
-    for d in decisions:
-        output.append(d.to_dict())
-    
+    # Sauvegarde
     os.makedirs("data", exist_ok=True)
-    with open("data/opportunities.json", "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
-    
-    logger.info(f"Sauvegardé {len(output)} décisions dans data/opportunities.json")
+    with open("data/opportunities.json", "w") as f:
+        json.dump(all_decisions, f, indent=2)
+    logger.info(f"Sauvegardé {len(all_decisions)} opportunités")
 
 if __name__ == "__main__":
     run_scan_and_save()

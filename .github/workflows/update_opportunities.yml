@@ -11,7 +11,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # ← Évite les runs trop longs (blocages)
+    timeout-minutes: 5  # ← Évite les runs trop longs (blocages)
 
     steps:
       - uses: actions/checkout@v4
