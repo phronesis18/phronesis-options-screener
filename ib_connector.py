@@ -3,6 +3,9 @@ ib_connector.py — Gestion de la connexion à TWS / IB Gateway
 =============================================================
 Fournit un singleton thread-safe pour la connexion IBKR via ib_insync.
 Gère la reconnexion automatique et les timeouts.
+
+Active automatiquement les données de marché en différé (Delayed Frozen) 
+via reqMarketDataType(3) pour bénéficier des données gratuites.
 """
 
 import logging
@@ -39,6 +42,7 @@ class IBConnector:
         """
         Tente de se connecter à TWS/Gateway.
         Retente jusqu'à max_retries fois en cas d'échec.
+        Active le mode de données différées (Delayed Frozen) après connexion.
         """
         if self._connected and self._ib.isConnected():
             logger.debug("Déjà connecté à IBKR.")
@@ -58,6 +62,13 @@ class IBConnector:
                     timeout=config.IBKR_TIMEOUT,
                     readonly=False,   # Permet de récupérer les données (nécessite TWS non "read-only")
                 )
+                # --- Activation des données différées (gratuites) ---
+                try:
+                    self._ib.reqMarketDataType(3)   # 3 = Delayed Frozen
+                    logger.info("✅ Données de marché en mode différé (Delayed Frozen) activées.")
+                except Exception as e:
+                    logger.warning(f"Impossible d'activer les données différées : {e}")
+
                 # Récupération sécurisée de la version serveur
                 if hasattr(self._ib, 'client') and self._ib.client is not None:
                     server_version = self._ib.client.serverVersion()
