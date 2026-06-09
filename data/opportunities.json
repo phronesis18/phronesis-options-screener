@@ -1,0 +1,35 @@
+[
+  {
+    "symbol": "SPY",
+    "strategy": "Iron Condor",
+    "strikes": "740/741",
+    "expiry": "20260618",
+    "dte": 10,
+    "credit": 0.53,
+    "risk": 47,
+    "score": 82,
+    "label": "Forte opportunité"
+  },
+  {
+    "symbol": "QQQ",
+    "strategy": "Bull Put Spread",
+    "strikes": "480/475",
+    "expiry": "20260625",
+    "dte": 17,
+    "credit": 1.20,
+    "risk": 115,
+    "score": 71,
+    "label": "Opportunité modérée"
+  },
+  {
+    "symbol": "AAPL",
+    "strategy": "Bear Call Spread",
+    "strikes": "190/195",
+    "expiry": "20260618",
+    "dte": 10,
+    "credit": 0.85,
+    "risk": 95,
+    "score": 68,
+    "label": "Opportunité modérée"
+  }
+]
