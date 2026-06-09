@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SYMBOLS = ["SPY", "QQQ", "AAPL", "MSFT", "NVDA"]
 DAYS_MIN = 7
-DAYS_MAX = 730
+DAYS_MAX = 1098
 
 def get_watchlist():
     path = "data/watchlist.json"
