@@ -2,13 +2,12 @@
 # OPTIONS SCREENER PHRONESIS — Dépendances Python
 # ============================================================
 
-# Connexion Interactive Brokers
+# Connexion Interactive Brokers (optionnel, fallback)
 ib_insync==0.9.86
 
-# Data & calculs
+# Data & calculs de base
 pandas>=2.0.0
 numpy>=1.24.0
-pandas_ta>=0.3.14b
 
 # Environnement & config
 python-dotenv>=1.0.0
@@ -16,22 +15,20 @@ python-dotenv>=1.0.0
 # HTTP (DeepSeek / OpenAI)
 requests>=2.31.0
 
-# Interface optionnelle Streamlit
+# Interface Streamlit
 streamlit>=1.35.0
-
-# Stockage SQLite (standard Python, pas de dépendance externe)
-# sqlite3 — inclus dans Python standard
 
 # Formatage console
 rich>=13.0.0
 
-# Scheduling (optionnel pour les crons Python)
+# Scheduling (optionnel)
 schedule>=1.2.0
 
-# Export JSON / CSV
+# Export Excel
 openpyxl>=3.1.0
 
-# Calculs financiers
+# Calculs financiers (Black-Scholes, stats)
 scipy>=1.11.0
+
+# Données de marché (fallback)
 yfinance>=0.2.28
-yfinance
