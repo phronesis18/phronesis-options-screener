@@ -88,7 +88,7 @@ if "dte" in df.columns:
     df = df.dropna(subset=["dte"])
 
 # Filtre DTE
-max_dte = st.sidebar.slider("Échéance maximale (DTE)", min_value=7, max_value=730, value=60, step=5,
+max_dte = st.sidebar.slider("Échéance maximale (DTE)", min_value=7, max_value=1098, value=60, step=5,
                             help="Afficher seulement les options avec DTE ≤ cette valeur")
 df = df[df["dte"] <= max_dte]
 
