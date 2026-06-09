@@ -8,7 +8,6 @@ import requests
 
 st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
 
-st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
 # Forcer le rendu en mode classique (évite certains bugs DOM)
 st.markdown("""
     <style>
@@ -114,12 +113,13 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Opportunités")
-    display_cols = ["symbol", "strategy", "score", "risk", "profit", "iv_rank", "dte", "label", "delta", "theta"]
+    # Colonnes à afficher (incluant les IV)
+    display_cols = ["symbol", "strategy", "score", "risk", "profit", "iv_rank", "iv_atm", "iv_otm", "iv_itm", "dte", "label", "delta", "theta"]
     available_cols = [c for c in display_cols if c in df.columns]
     
     # Copie pour arrondir
     display_df = df[available_cols].copy()
-    numeric_cols = ['score', 'risk', 'profit', 'dte', 'delta', 'theta', 'credit']
+    numeric_cols = ['score', 'risk', 'profit', 'dte', 'delta', 'theta', 'iv_atm', 'iv_otm', 'iv_itm']
     for col in numeric_cols:
         if col in display_df.columns:
             display_df[col] = display_df[col].round(2)
@@ -141,8 +141,17 @@ with tab1:
             st.metric("Risque", f"{sel_row.get('risk',0)}$")
         with col_b:
             st.metric("Profit max", f"+{sel_row.get('profit',0)}$")
-            st.metric("IV Rank", sel_row.get("iv_rank", ""))
+            st.metric("IV Rank", sel_row.get("iv_rank", "N/A"))
             st.metric("DTE", f"{sel_row.get('dte',0)} jours")
+        # Afficher les trois IV en détail
+        st.markdown("**Volatilité implicite**")
+        iv_atm = sel_row.get('iv_atm')
+        iv_otm = sel_row.get('iv_otm')
+        iv_itm = sel_row.get('iv_itm')
+        col_c, col_d, col_e = st.columns(3)
+        col_c.metric("IV ATM", f"{iv_atm:.1%}" if iv_atm else "N/A")
+        col_d.metric("IV OTM", f"{iv_otm:.1%}" if iv_otm else "N/A")
+        col_e.metric("IV ITM", f"{iv_itm:.1%}" if iv_itm else "N/A")
         st.json(sel_row)
 
 # ---------- Onglet Portfolio ----------
@@ -152,7 +161,7 @@ with tab2:
         st.info("Aucune opportunité disponible pour construire le portefeuille.")
     else:
         portfolio_df = df.sort_values("score", ascending=False).head(12).copy()
-        numeric_cols = ['score', 'risk', 'profit', 'dte', 'delta', 'theta', 'credit']
+        numeric_cols = ['score', 'risk', 'profit', 'dte', 'delta', 'theta', 'iv_atm', 'iv_otm', 'iv_itm']
         for col in numeric_cols:
             if col in portfolio_df.columns:
                 portfolio_df[col] = portfolio_df[col].round(2)
@@ -177,10 +186,14 @@ with tab2:
                 col_a, col_b = st.columns(2)
                 with col_a:
                     st.metric("Risque", f"{row['risk']:.2f}$")
-                    st.metric("IV Rank", row['iv_rank'])
+                    st.metric("IV Rank", row['iv_rank'] if 'iv_rank' in row else "N/A")
                 with col_b:
                     st.metric("Profit max", f"+{row['profit']:.2f}$")
                     st.metric("DTE", f"{row['dte']:.0f} jours")
+                # Afficher les IV
+                st.markdown("**IV :** ATM = " + (f"{row['iv_atm']:.1%}" if pd.notna(row.get('iv_atm')) else "N/A") +
+                            " | OTM = " + (f"{row['iv_otm']:.1%}" if pd.notna(row.get('iv_otm')) else "N/A") +
+                            " | ITM = " + (f"{row['iv_itm']:.1%}" if pd.notna(row.get('iv_itm')) else "N/A"))
                 st.json(row.to_dict())
 
 # ---------- Onglet Glossaire ----------
