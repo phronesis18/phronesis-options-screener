@@ -6,8 +6,6 @@ from datetime import datetime
 import os
 import requests
 import subprocess
-import threading
-import queue
 
 st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
 
@@ -72,12 +70,10 @@ with st.sidebar:
     
     # --- Bouton de scan manuel avec progression ---
     if st.button("🔄 Scanner maintenant (manuel)"):
-        # Créer un placeholder pour la progression
         status_placeholder = st.empty()
         progress_bar = status_placeholder.progress(0, text="Démarrage...")
         log_text = status_placeholder.empty()
         
-        # Lancer le script et capter la sortie
         process = subprocess.Popen(
             ["python", "scripts/update_data.py"],
             stdout=subprocess.PIPE,
@@ -85,19 +81,15 @@ with st.sidebar:
             text=True,
             bufsize=1
         )
-        current_progress = 0
         output_lines = []
         for line in iter(process.stdout.readline, ""):
             output_lines.append(line)
-            # Détecter PROGRESS:X
             if line.startswith("PROGRESS:"):
                 try:
                     pct = int(line.split(":")[1].strip())
-                    current_progress = pct
                     progress_bar.progress(pct, text=f"Scan en cours... {pct}%")
                 except:
                     pass
-            # Détecter SCAN: symbole pour afficher en temps réel
             elif line.startswith("SCAN:"):
                 log_text.text(line.strip())
         process.wait()
