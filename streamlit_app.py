@@ -38,7 +38,7 @@ def save_watchlist(wl):
 # ---------- Sidebar ----------
 with st.sidebar:
     st.markdown("## 🧠 Phronesis")
-    st.markdown("Options Screener v4.0")
+    st.markdown("Options Screener v1.0")
     st.divider()
 
     with st.expander("📋 Watchlist permanente", expanded=True):
