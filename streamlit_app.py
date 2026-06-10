@@ -37,7 +37,7 @@ def save_watchlist(wl):
 
 # ---------- Sidebar ----------
 with st.sidebar:
-    st.markdown("## 🧠 Phronesis")
+    st.markdown("## 💎 PHRONESIS")
     st.markdown("Options Screener v1.0")
     st.divider()
 
@@ -266,7 +266,7 @@ with tab4:
                 "messages": [{"role": "system", "content": "Tu es l'assistant IA de Phronesis Options Screener."},
                              {"role": "user", "content": prompt}],
                 "temperature": 0.7,
-                "max_tokens": 500
+                "min_tokens": 200
             }
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=15)
