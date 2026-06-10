@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import time  # <-- AJOUT pour les pauses
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,6 +86,8 @@ def get_option_chain_yfinance(symbol: str, days_min: int, days_max: int):
                     'volume': row['volume'] if not pd.isna(row['volume']) else 0,
                     'dte': dte,
                 })
+        # Petite pause entre chaque expiration pour ne pas saturer Yahoo Finance
+        time.sleep(0.2)
     df = pd.DataFrame(rows)
     if not df.empty:
         spot = get_spot_yfinance(symbol)
@@ -155,6 +158,9 @@ def run_scan_and_save():
         pct = int(idx / total * 100)
         progress(pct, f"SCAN: {symbol} ({idx}/{total})")
         logger.info(f"Scan {symbol} ({idx}/{total})...")
+        
+        # Pause avant chaque requête principale pour respecter les limites de Yahoo Finance
+        time.sleep(1.2)   # <-- PAUSE CRITIQUE
         
         chain = get_option_chain_yfinance(symbol, DAYS_MIN, DAYS_MAX)
         if chain.empty:
