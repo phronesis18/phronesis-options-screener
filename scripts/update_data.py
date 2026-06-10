@@ -1,6 +1,6 @@
 """
 update_data.py — Scan périodique pour générer les opportunités
-Intègre le calcul des IV ATM, OTM, ITM à partir des options.
+Affiche des messages de progression pour l'interface.
 """
 
 import json
@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_SYMBOLS = ["SPY", "QQQ", "AAPL", "MSFT", "NVDA"]
 DAYS_MIN = 7
 DAYS_MAX = 1098
+
+def progress(percent: int, msg: str = ""):
+    """Émet un message de progression lisible par Streamlit."""
+    print(f"PROGRESS:{percent}")
+    if msg:
+        print(msg)
 
 def get_watchlist():
     path = "data/watchlist.json"
@@ -118,7 +124,6 @@ def add_greeks_bs(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     df['theta'] = np.where(is_call, theta_call, theta_put) / 365.0
     vega = (S * norm.pdf(d1) * np.sqrt(T)) / 100
     df['vega'] = vega
-    # remplacer les NaN par des valeurs par défaut
     df['delta'] = df['delta'].fillna(0.2)
     df['theta'] = df['theta'].fillna(-0.05)
     df['gamma'] = df['gamma'].fillna(0.01)
@@ -126,21 +131,12 @@ def add_greeks_bs(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     return df
 
 def compute_iv_metrics(chain: pd.DataFrame, spot: float) -> dict:
-    """
-    Calcule IV ATM, OTM, ITM à partir du DataFrame des options (après grecques).
-    OTM : delta entre 0.15 et 0.30 (calls) ou -0.15 à -0.30 (puts)
-    ITM : delta > 0.70 ou < -0.70
-    ATM : l'option avec le strike le plus proche du spot.
-    """
     metrics = {"iv_atm": None, "iv_otm": None, "iv_itm": None}
     if chain.empty or 'iv' not in chain.columns:
         return metrics
-    # IV ATM (strike le plus proche du spot)
     chain['strike_diff'] = (chain['strike'] - spot).abs()
     atm_row = chain.loc[chain['strike_diff'].idxmin()]
     metrics["iv_atm"] = round(atm_row['iv'], 4) if pd.notna(atm_row['iv']) else None
-
-    # Filtrer OTM et ITM par delta
     otm = chain[(abs(chain['delta']) >= 0.15) & (abs(chain['delta']) <= 0.30)]
     itm = chain[abs(chain['delta']) >= 0.70]
     if not otm.empty:
@@ -151,10 +147,15 @@ def compute_iv_metrics(chain: pd.DataFrame, spot: float) -> dict:
 
 def run_scan_and_save():
     symbols = get_watchlist()
-    all_decisions = []
     total = len(symbols)
+    all_decisions = []
+    
+    progress(0, "Démarrage du scan...")
     for idx, symbol in enumerate(symbols, 1):
+        pct = int(idx / total * 100)
+        progress(pct, f"SCAN: {symbol} ({idx}/{total})")
         logger.info(f"Scan {symbol} ({idx}/{total})...")
+        
         chain = get_option_chain_yfinance(symbol, DAYS_MIN, DAYS_MAX)
         if chain.empty:
             logger.warning(f"Pas d'options pour {symbol}")
@@ -167,17 +168,14 @@ def run_scan_and_save():
             logger.info(f"{symbol} : spread trop large ({avg_spread:.2f}$)")
             continue
 
-        # Calcul des grecques
         chain = add_greeks_bs(chain, symbol)
         spot = chain['spot'].iloc[0] if 'spot' in chain.columns else get_spot_yfinance(symbol)
 
-        # Métriques IV
         iv_metrics = compute_iv_metrics(chain, spot)
         iv_atm = iv_metrics["iv_atm"]
         iv_otm = iv_metrics["iv_otm"]
         iv_itm = iv_metrics["iv_itm"]
 
-        # IV Rank à partir de l'IV ATM (si disponible)
         iv_pct = 50
         if iv_atm is not None:
             save_iv(symbol, iv_atm)
@@ -186,7 +184,6 @@ def run_scan_and_save():
                 iv_pct = 50
         logger.info(f"{symbol} IV ATM={iv_atm} OTM={iv_otm} ITM={iv_itm} Rank={iv_pct:.0f}%")
 
-        # Construction des spreads
         builder = SpreadBuilder()
         candidates = builder.build_all(
             symbol, chain,
@@ -237,10 +234,12 @@ def run_scan_and_save():
                 "delta": round(leg1_delta, 2),
                 "theta": round(leg1_theta, 2),
             })
+    
     os.makedirs("data", exist_ok=True)
     with open("data/opportunities.json", "w") as f:
         json.dump(all_decisions, f, indent=2)
     logger.info(f"Sauvegardé {len(all_decisions)} opportunités")
+    progress(100, "Scan terminé.")
 
 if __name__ == "__main__":
     run_scan_and_save()

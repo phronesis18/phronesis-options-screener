@@ -5,6 +5,9 @@ import plotly.express as px
 from datetime import datetime
 import os
 import requests
+import subprocess
+import threading
+import queue
 
 st.set_page_config(page_title="Phronesis Screener v4", layout="wide", initial_sidebar_state="expanded")
 
@@ -15,7 +18,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- Clé API DeepSeek (à mettre dans secrets en prod) ----------
+# ---------- Clé API DeepSeek ----------
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
 
 # ---------- Gestion de la watchlist ----------
@@ -66,6 +69,46 @@ with st.sidebar:
     st.metric("Score ≥ 50", "42", help="Opportunités valides")
     st.metric("Décisions GO", "7" if risk_enabled else "10", delta="≤120$" if risk_enabled else "sans contrainte")
     st.divider()
+    
+    # --- Bouton de scan manuel avec progression ---
+    if st.button("🔄 Scanner maintenant (manuel)"):
+        # Créer un placeholder pour la progression
+        status_placeholder = st.empty()
+        progress_bar = status_placeholder.progress(0, text="Démarrage...")
+        log_text = status_placeholder.empty()
+        
+        # Lancer le script et capter la sortie
+        process = subprocess.Popen(
+            ["python", "scripts/update_data.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        current_progress = 0
+        output_lines = []
+        for line in iter(process.stdout.readline, ""):
+            output_lines.append(line)
+            # Détecter PROGRESS:X
+            if line.startswith("PROGRESS:"):
+                try:
+                    pct = int(line.split(":")[1].strip())
+                    current_progress = pct
+                    progress_bar.progress(pct, text=f"Scan en cours... {pct}%")
+                except:
+                    pass
+            # Détecter SCAN: symbole pour afficher en temps réel
+            elif line.startswith("SCAN:"):
+                log_text.text(line.strip())
+        process.wait()
+        status_placeholder.empty()
+        if process.returncode == 0:
+            st.success("✅ Scan terminé ! Affichage actualisé.")
+            st.rerun()
+        else:
+            st.error(f"❌ Erreur lors du scan : {''.join(output_lines[-5:])}")
+    
+    st.divider()
     st.markdown("**TWS · Paper** · Connecté")
     st.caption(f"Dernier scan : {datetime.now().strftime('%H:%M')}")
 
@@ -99,7 +142,7 @@ if risk_enabled and "risk" in df.columns:
 # ---------- Onglets ----------
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📈 Portfolio", "📖 Glossaire", "🤖 Assistant IA"])
 
-# ---------- Onglet Dashboard ----------
+# ---------- Dashboard ----------
 with tab1:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Opportunités GO", len(df))
@@ -113,11 +156,9 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Opportunités")
-    # Colonnes à afficher (incluant les IV)
     display_cols = ["symbol", "strategy", "score", "risk", "profit", "iv_rank", "iv_atm", "iv_otm", "iv_itm", "dte", "label", "delta", "theta"]
     available_cols = [c for c in display_cols if c in df.columns]
     
-    # Copie pour arrondir
     display_df = df[available_cols].copy()
     numeric_cols = ['score', 'risk', 'profit', 'dte', 'delta', 'theta', 'iv_atm', 'iv_otm', 'iv_itm']
     for col in numeric_cols:
@@ -129,7 +170,6 @@ with tab1:
     if not df.empty:
         selected = st.selectbox("Choisissez un symbole", df["symbol"].unique())
         sel_row = df[df["symbol"] == selected].iloc[0].to_dict()
-        # Arrondir les valeurs dans le détail
         for k in numeric_cols:
             if k in sel_row and isinstance(sel_row[k], (float, int)):
                 sel_row[k] = round(sel_row[k], 2)
@@ -143,7 +183,6 @@ with tab1:
             st.metric("Profit max", f"+{sel_row.get('profit',0)}$")
             st.metric("IV Rank", sel_row.get("iv_rank", "N/A"))
             st.metric("DTE", f"{sel_row.get('dte',0)} jours")
-        # Afficher les trois IV en détail
         st.markdown("**Volatilité implicite**")
         iv_atm = sel_row.get('iv_atm')
         iv_otm = sel_row.get('iv_otm')
@@ -154,7 +193,7 @@ with tab1:
         col_e.metric("IV ITM", f"{iv_itm:.1%}" if iv_itm else "N/A")
         st.json(sel_row)
 
-# ---------- Onglet Portfolio ----------
+# ---------- Portfolio ----------
 with tab2:
     st.subheader("Construction automatique du portefeuille")
     if df.empty:
@@ -190,13 +229,13 @@ with tab2:
                 with col_b:
                     st.metric("Profit max", f"+{row['profit']:.2f}$")
                     st.metric("DTE", f"{row['dte']:.0f} jours")
-                # Afficher les IV
-                st.markdown("**IV :** ATM = " + (f"{row['iv_atm']:.1%}" if pd.notna(row.get('iv_atm')) else "N/A") +
-                            " | OTM = " + (f"{row['iv_otm']:.1%}" if pd.notna(row.get('iv_otm')) else "N/A") +
-                            " | ITM = " + (f"{row['iv_itm']:.1%}" if pd.notna(row.get('iv_itm')) else "N/A"))
+                iv_atm = row.get('iv_atm')
+                iv_otm = row.get('iv_otm')
+                iv_itm = row.get('iv_itm')
+                st.markdown(f"**IV :** ATM = {iv_atm:.1% if iv_atm else 'N/A'} | OTM = {iv_otm:.1% if iv_otm else 'N/A'} | ITM = {iv_itm:.1% if iv_itm else 'N/A'}")
                 st.json(row.to_dict())
 
-# ---------- Onglet Glossaire ----------
+# ---------- Glossaire ----------
 with tab3:
     st.markdown("### Glossaire des options (52 termes essentiels)")
     glossary = {
@@ -215,34 +254,27 @@ with tab3:
             with st.expander(term):
                 st.write(defi)
 
-# ---------- Onglet Assistant IA (DeepSeek) ----------
+# ---------- Assistant IA ----------
 with tab4:
     st.subheader("💬 Assistant IA Phronesis")
     if not DEEPSEEK_API_KEY:
-        st.warning("Clé API DeepSeek non configurée. Ajoutez DEEPSEEK_API_KEY dans les secrets.")
+        st.warning("Clé API DeepSeek non configurée.")
     else:
         def ask_deepseek(prompt):
             url = "https://api.deepseek.com/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
             payload = {
                 "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "Tu es l'assistant IA de Phronesis Options Screener."},
-                    {"role": "user", "content": prompt}
-                ],
+                "messages": [{"role": "system", "content": "Tu es l'assistant IA de Phronesis Options Screener."},
+                             {"role": "user", "content": prompt}],
                 "temperature": 0.7,
                 "max_tokens": 500
             }
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=15)
-                response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
+                resp = requests.post(url, headers=headers, json=payload, timeout=15)
+                return resp.json()["choices"][0]["message"]["content"]
             except Exception as e:
                 return f"Erreur : {e}"
-
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
         for msg in st.session_state.chat_history:
