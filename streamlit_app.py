@@ -18,7 +18,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------- Clé API DeepSeek ----------
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
+# Chercher la clé d'abord dans les secrets Streamlit, puis dans les variables d'environnement
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", os.getenv("DEEPSEEK_API_KEY", ""))
 
 # ---------- Gestion de la watchlist ----------
 WATCHLIST_FILE = "data/watchlist.json"
