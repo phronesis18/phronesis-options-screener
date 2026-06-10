@@ -2,36 +2,32 @@
 # OPTIONS SCREENER PHRONESIS — Dépendances Python
 # ============================================================
 
+# Interface utilisateur
+streamlit>=1.35.0
+plotly>=5.24.0
+
+# Data & calculs fondamentaux
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Données de marché (fallback principal)
+yfinance>=0.2.28
+
 # Connexion Interactive Brokers (optionnel, fallback)
 ib_insync==0.9.86
 
-# Data & calculs de base
-pandas>=2.0.0
-numpy>=1.24.0
-
-# Environnement & config
+# Configuration & variables d'environnement
 python-dotenv>=1.0.0
 
-# HTTP (DeepSeek / OpenAI)
+# Requêtes HTTP (DeepSeek, Twelve Data, Alpha Vantage)
 requests>=2.31.0
 
-# Interface Streamlit
-streamlit>=1.35.0
-
-# Graphiques (histogramme des scores)
-plotly>=5.24.0
-
-# Formatage console
+# Formatage console (optionnel)
 rich>=13.0.0
 
-# Scheduling (optionnel)
+# Planification (optionnel)
 schedule>=1.2.0
 
-# Export Excel
+# Export Excel (optionnel)
 openpyxl>=3.1.0
-
-# Calculs financiers (Black-Scholes, stats)
-scipy>=1.11.0
-
-# Données de marché (fallback)
-yfinance>=0.2.28
