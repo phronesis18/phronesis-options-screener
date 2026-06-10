@@ -221,10 +221,14 @@ with tab2:
                 with col_b:
                     st.metric("Profit max", f"+{row['profit']:.2f}$")
                     st.metric("DTE", f"{row['dte']:.0f} jours")
+                # Correction de l'affichage des IV
                 iv_atm = row.get('iv_atm')
                 iv_otm = row.get('iv_otm')
                 iv_itm = row.get('iv_itm')
-                st.markdown(f"**IV :** ATM = {iv_atm:.1% if iv_atm else 'N/A'} | OTM = {iv_otm:.1% if iv_otm else 'N/A'} | ITM = {iv_itm:.1% if iv_itm else 'N/A'}")
+                iv_atm_str = f"{iv_atm:.1%}" if iv_atm else "N/A"
+                iv_otm_str = f"{iv_otm:.1%}" if iv_otm else "N/A"
+                iv_itm_str = f"{iv_itm:.1%}" if iv_itm else "N/A"
+                st.markdown(f"**IV :** ATM = {iv_atm_str} | OTM = {iv_otm_str} | ITM = {iv_itm_str}")
                 st.json(row.to_dict())
 
 # ---------- Glossaire ----------
