@@ -4,6 +4,7 @@ import json
 import plotly.express as px
 from datetime import datetime
 import os
+import sys
 import requests
 import subprocess
 
@@ -75,7 +76,7 @@ with st.sidebar:
         log_text = status_placeholder.empty()
         
         process = subprocess.Popen(
-            ["python", "scripts/update_data.py"],
+            [sys.executable, "scripts/update_data.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
