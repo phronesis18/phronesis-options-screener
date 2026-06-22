@@ -2,7 +2,7 @@ name: Update Opportunities
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/59 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 59  # ← Évite les runs trop longs (blocages)
+    timeout-minutes: 300  # ← Évite les runs trop longs et trop courtes (blocages)
 
     steps:
       - uses: actions/checkout@v4
