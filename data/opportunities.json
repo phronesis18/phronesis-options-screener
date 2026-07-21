@@ -32654,24 +32654,6 @@
   {
     "symbol": "XLF",
     "strategy": "bull_put",
-    "strikes": "43/42",
-    "expiry": "20261231",
-    "dte": 163,
-    "credit": 0.57,
-    "risk": 43.0,
-    "profit": 57.0,
-    "iv_rank": "50%",
-    "iv_atm": 0.0,
-    "iv_otm": 0.3041,
-    "iv_itm": 0.0265,
-    "score": 32,
-    "label": "\ud83d\udd34 Opportunit\u00e9 faible",
-    "delta": -0.12,
-    "theta": -0.01
-  },
-  {
-    "symbol": "XLF",
-    "strategy": "bull_put",
     "strikes": "43/40",
     "expiry": "20281215",
     "dte": 878,
@@ -32686,6 +32668,24 @@
     "label": "\ud83d\udd34 Opportunit\u00e9 faible",
     "delta": -0.1,
     "theta": -0.0
+  },
+  {
+    "symbol": "XLF",
+    "strategy": "bull_put",
+    "strikes": "43/42",
+    "expiry": "20261231",
+    "dte": 163,
+    "credit": 0.57,
+    "risk": 43.0,
+    "profit": 57.0,
+    "iv_rank": "50%",
+    "iv_atm": 0.0,
+    "iv_otm": 0.3041,
+    "iv_itm": 0.0265,
+    "score": 32,
+    "label": "\ud83d\udd34 Opportunit\u00e9 faible",
+    "delta": -0.12,
+    "theta": -0.01
   },
   {
     "symbol": "XLF",
@@ -32718,7 +32718,7 @@
     "iv_atm": 0.0,
     "iv_otm": 0.3041,
     "iv_itm": 0.0265,
-    "score": 30,
+    "score": 32,
     "label": "\ud83d\udd34 Opportunit\u00e9 faible",
     "delta": 0.46,
     "theta": -0.01
@@ -32754,7 +32754,7 @@
     "iv_atm": 0.0,
     "iv_otm": 0.3041,
     "iv_itm": 0.0265,
-    "score": 29,
+    "score": 31,
     "label": "\ud83d\udd34 Opportunit\u00e9 faible",
     "delta": 0.46,
     "theta": -0.01
