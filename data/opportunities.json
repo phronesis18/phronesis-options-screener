@@ -22707,7 +22707,7 @@
     "risk": -870.0,
     "profit": 1370.0,
     "iv_rank": "50%",
-    "iv_atm": 0.0,
+    "iv_atm": 0.0156,
     "iv_otm": null,
     "iv_itm": 0.1978,
     "score": 28,
